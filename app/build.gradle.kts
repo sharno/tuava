@@ -6,8 +6,8 @@
  */
 
 plugins {
-    // Apply the application plugin to add support for building a CLI application in Java.
-    application
+    // Apply the java-library plugin to add support for building a library in Java.
+    `java-library`
 }
 
 repositories {
@@ -30,11 +30,6 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
-}
-
-application {
-    // Define the main class for the application.
-    mainClass = "org.example.App"
 }
 
 tasks.named<Test>("test") {

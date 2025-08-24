@@ -12,3 +12,4 @@ plugins {
 
 rootProject.name = "tuava"
 include("app")
+include("examples")
