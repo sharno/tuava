@@ -131,60 +131,53 @@ public class TodoApp {
 
         @Override
         public String view() {
-            Style titleStyle = Style.of().foreground(Style.Color.MAGENTA).withBold();
-            Style selectedStyle = Style.of().background(Style.Color.BLUE).foreground(Style.Color.WHITE);
-            Style completedStyle = Style.of().foreground(Style.Color.GREEN);
-            Style incompleteStyle = Style.of().foreground(Style.Color.WHITE);
-            Style statusStyle = Style.of().foreground(Style.Color.YELLOW);
-            Style inputStyle = Style.of().foreground(Style.Color.CYAN);
+            java.util.List<Element> listItems = new java.util.ArrayList<>();
 
-            StringBuilder view = new StringBuilder();
-
-            // Title
-            view.append(Layout.center(titleStyle.render("┌─ Tuava Todo App ─┐"), 60)).append("\n\n");
-
-            // Todo list
             if (todos.isEmpty()) {
-                view.append(Layout.center("No todos yet! Press 'a' to add one.", 60)).append("\n");
+                listItems.add(Text.plain().build("No todos yet! Press 'a' to add one."));
             } else {
                 for (int i = 0; i < todos.size(); i++) {
                     TodoItem todo = todos.get(i);
                     String checkbox = todo.completed() ? "[✓]" : "[ ]";
-                    String text = todo.text();
+                    String text = checkbox + " " + todo.text();
 
-                    Style itemStyle = todo.completed() ? completedStyle : incompleteStyle;
-                    String line = checkbox + " " + text;
-
+                    String line = text;
                     if (i == selectedIndex && mode == AppMode.VIEWING) {
-                        line = selectedStyle.render(" " + line + " ");
+                        line = Style.of().background(Style.Color.BLUE).foreground(Style.Color.WHITE).render(" " + line + " ");
                     } else {
-                        line = itemStyle.render(line);
+                        line = (todo.completed() ? Style.of().foreground(Style.Color.GREEN) : Style.of().foreground(Style.Color.WHITE)).render(line);
                     }
 
-                    view.append(Layout.center(line, 60)).append("\n");
+                    listItems.add(Text.plain().build(line));
                 }
             }
 
-            view.append("\n");
+            Element ui = Flex.column()
+                    .align(Flex.Align.CENTER)
+                    .justify(Flex.Justify.START)
+                    .gap(1)
+                    .width(60)
+                    .children(java.util.List.of(
+                            Text.bold().foreground(Style.Color.MAGENTA).build("┌─ Tuava Todo App ─┐"),
+                            Flex.column().gap(0).align(Flex.Align.START).children(listItems).build(),
+                            ifAdding(),
+                            Text.plain().foreground(Style.Color.YELLOW).build(statusMessage),
+                            Text.plain().build(switch (mode) {
+                                case VIEWING -> "j/k or ↑↓: navigate | Space/Enter: toggle | a: add | d: delete | q: quit";
+                                case ADDING -> "Type todo text | Enter: save | Escape: cancel";
+                            })
+                    ))
+                    .build();
 
-            // Input area (when adding)
+            return ui.render();
+        }
+
+        private Element ifAdding() {
             if (mode == AppMode.ADDING) {
                 String inputLine = "New todo: " + inputBuffer + "█";
-                view.append(Layout.center(inputStyle.render(inputLine), 60)).append("\n\n");
+                return Text.plain().foreground(Style.Color.CYAN).build(inputLine);
             }
-
-            // Status message
-            view.append(Layout.center(statusStyle.render(statusMessage), 60)).append("\n\n");
-
-            // Controls
-            String controls = switch (mode) {
-                case VIEWING -> "j/k or ↑↓: navigate | Space/Enter: toggle | a: add | d: delete | q: quit";
-                case ADDING -> "Type todo text | Enter: save | Escape: cancel";
-            };
-
-            view.append(Layout.center(controls, 60));
-
-            return view.toString();
+            return Text.plain().build("");
         }
     }
 

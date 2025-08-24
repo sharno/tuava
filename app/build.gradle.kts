@@ -36,3 +36,8 @@ tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
 }
+
+// Ensure UTF-8 source encoding (fixes Windows default cp1252 issues)
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+}

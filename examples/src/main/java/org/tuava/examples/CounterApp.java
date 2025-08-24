@@ -37,25 +37,20 @@ public class CounterApp {
 
         @Override
         public String view() {
-            Style titleStyle = Style.of().foreground(Style.Color.CYAN).withBold();
-            Style counterStyle = Style.of().foreground(Style.Color.GREEN).withBold();
-            Style statusStyle = Style.of().foreground(Style.Color.YELLOW);
+            Element ui = Flex.column()
+                    .align(Flex.Align.CENTER)
+                    .justify(Flex.Justify.START)
+                    .gap(1)
+                    .width(50)
+                    .children(java.util.List.of(
+                            Text.bold().foreground(Style.Color.CYAN).build("┌─ Tuava Counter App ─┐"),
+                            Text.bold().foreground(Style.Color.GREEN).build("Count: " + count),
+                            Text.plain().foreground(Style.Color.YELLOW).build(status),
+                            Text.plain().build("Controls: +/- to change, ↑↓ arrows, Enter to reset, q to quit")
+                    ))
+                    .build();
 
-            String title = titleStyle.render("┌─ Tuava Counter App ─┐");
-            String counterDisplay = counterStyle.render("Count: " + count);
-            String statusDisplay = statusStyle.render(status);
-            String instructions = "Controls: +/- to change, ↑↓ arrows, Enter to reset, q to quit";
-
-            return Layout.verticalJoin(java.util.List.of(
-                    "",
-                    Layout.center(title, 50),
-                    "",
-                    Layout.center(counterDisplay, 50),
-                    "",
-                    Layout.center(statusDisplay, 50),
-                    "",
-                    Layout.center(instructions, 50),
-                    ""));
+            return ui.render();
         }
     }
 

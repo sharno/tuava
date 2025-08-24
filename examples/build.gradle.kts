@@ -37,3 +37,8 @@ tasks.register<JavaExec>("runTodo") {
     mainClass = "org.tuava.examples.TodoApp"
     standardInput = System.`in`
 }
+
+// Ensure UTF-8 source encoding
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+}
