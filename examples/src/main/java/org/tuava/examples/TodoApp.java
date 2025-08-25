@@ -21,7 +21,7 @@ public class TodoApp {
             int selectedIndex,
             AppMode mode,
             String inputBuffer,
-            String statusMessage) implements Model {
+            String statusMessage) implements Model<Event> {
 
         public static TodoModel initial() {
             List<TodoItem> initialTodos = List.of(
@@ -31,102 +31,178 @@ public class TodoApp {
             return new TodoModel(initialTodos, 0, AppMode.VIEWING, "", "Welcome to Tuava Todo!");
         }
 
+        public Builder toBuilder() {
+            return new Builder(this);
+        }
+
+        public static final class Builder {
+            private List<TodoItem> todos;
+            private int selectedIndex;
+            private AppMode mode;
+            private String inputBuffer;
+            private String statusMessage;
+
+            public Builder(TodoModel m) {
+                this.todos = m.todos;
+                this.selectedIndex = m.selectedIndex;
+                this.mode = m.mode;
+                this.inputBuffer = m.inputBuffer;
+                this.statusMessage = m.statusMessage;
+            }
+
+            public Builder todos(List<TodoItem> v) {
+                this.todos = v;
+                return this;
+            }
+
+            public Builder selectedIndex(int v) {
+                this.selectedIndex = v;
+                return this;
+            }
+
+            public Builder mode(AppMode v) {
+                this.mode = v;
+                return this;
+            }
+
+            public Builder inputBuffer(String v) {
+                this.inputBuffer = v;
+                return this;
+            }
+
+            public Builder statusMessage(String v) {
+                this.statusMessage = v;
+                return this;
+            }
+
+            public TodoModel build() {
+                return new TodoModel(todos, selectedIndex, mode, inputBuffer, statusMessage);
+            }
+        }
+
         @Override
-        public Model update(Event event) {
+        public Update<Event> update(Event event) {
             return switch (event) {
                 case Event.KeyEvent keyEvent -> handleKeyEvent(keyEvent);
-                default -> new TodoModel(todos, selectedIndex, mode, inputBuffer,
-                        "Event: " + event.getClass().getSimpleName());
+                default -> Update.of(this.toBuilder()
+                        .statusMessage("Event: " + event.getClass().getSimpleName())
+                        .build());
             };
         }
 
-        private TodoModel handleKeyEvent(Event.KeyEvent keyEvent) {
+        private Update<Event> handleKeyEvent(Event.KeyEvent keyEvent) {
             return switch (mode) {
                 case VIEWING -> handleViewingMode(keyEvent);
                 case ADDING -> handleAddingMode(keyEvent);
             };
         }
 
-        private TodoModel handleViewingMode(Event.KeyEvent keyEvent) {
+        private Update<Event> handleViewingMode(Event.KeyEvent keyEvent) {
             return switch (keyEvent.key()) {
                 case CHAR -> switch (keyEvent.sequence()) {
-                    case "q" -> this;
-                    case "j" -> moveDown();
-                    case "k" -> moveUp();
-                    case " " -> toggleSelected();
-                    case "a" -> new TodoModel(todos, selectedIndex, AppMode.ADDING, "", "Enter new todo:");
-                    case "d" -> deleteSelected();
-                    default -> new TodoModel(todos, selectedIndex, mode, inputBuffer,
-                            "Unknown key: " + keyEvent.sequence());
+                    case "q" -> Update.of(this, Effect.quit());
+                    case "j" -> Update.of(moveDown());
+                    case "k" -> Update.of(moveUp());
+                    case " " -> Update.of(toggleSelected());
+                    case "a" -> Update.of(this.toBuilder()
+                            .mode(AppMode.ADDING)
+                            .inputBuffer("")
+                            .statusMessage("Enter new todo:")
+                            .build());
+                    case "d" -> Update.of(deleteSelected());
+                    default -> Update.of(this.toBuilder()
+                            .statusMessage("Unknown key: " + keyEvent.sequence())
+                            .build());
                 };
-                case ARROW_DOWN -> moveDown();
-                case ARROW_UP -> moveUp();
-                case ENTER -> toggleSelected();
-                default -> new TodoModel(todos, selectedIndex, mode, inputBuffer,
-                        "Key: " + keyEvent.key());
+                case ARROW_DOWN -> Update.of(moveDown());
+                case ARROW_UP -> Update.of(moveUp());
+                case ENTER -> Update.of(toggleSelected());
+                default -> Update.of(this.toBuilder()
+                        .statusMessage("Key: " + keyEvent.key())
+                        .build());
             };
         }
 
-        private TodoModel handleAddingMode(Event.KeyEvent keyEvent) {
+        private Update<Event> handleAddingMode(Event.KeyEvent keyEvent) {
             return switch (keyEvent.key()) {
-                case CHAR -> new TodoModel(todos, selectedIndex, mode,
-                        inputBuffer + keyEvent.sequence(), statusMessage);
-                case BACKSPACE -> new TodoModel(todos, selectedIndex, mode,
-                        inputBuffer.isEmpty() ? "" : inputBuffer.substring(0, inputBuffer.length() - 1),
-                        statusMessage);
+                case CHAR -> Update.of(this.toBuilder()
+                        .inputBuffer(inputBuffer + keyEvent.sequence())
+                        .build());
+                case BACKSPACE -> Update.of(this.toBuilder()
+                        .inputBuffer(inputBuffer.isEmpty() ? "" : inputBuffer.substring(0, inputBuffer.length() - 1))
+                        .build());
                 case ENTER -> {
                     if (!inputBuffer.trim().isEmpty()) {
                         List<TodoItem> newTodos = new ArrayList<>(todos);
                         newTodos.add(new TodoItem(inputBuffer.trim(), false));
-                        yield new TodoModel(newTodos, selectedIndex, AppMode.VIEWING, "",
-                                "Added: " + inputBuffer.trim());
+                        yield Update.of(this.toBuilder()
+                                .todos(newTodos)
+                                .mode(AppMode.VIEWING)
+                                .inputBuffer("")
+                                .statusMessage("Added: " + inputBuffer.trim())
+                                .build());
                     } else {
-                        yield new TodoModel(todos, selectedIndex, AppMode.VIEWING, "",
-                                "Cancelled adding todo");
+                        yield Update.of(this.toBuilder()
+                                .mode(AppMode.VIEWING)
+                                .inputBuffer("")
+                                .statusMessage("Cancelled adding todo")
+                                .build());
                     }
                 }
-                case ESCAPE -> new TodoModel(todos, selectedIndex, AppMode.VIEWING, "",
-                        "Cancelled adding todo");
-                default -> this;
+                case ESCAPE -> Update.of(this.toBuilder()
+                        .mode(AppMode.VIEWING)
+                        .inputBuffer("")
+                        .statusMessage("Cancelled adding todo")
+                        .build());
+                default -> Update.of(this);
             };
         }
 
         private TodoModel moveDown() {
             int newIndex = selectedIndex < todos.size() - 1 ? selectedIndex + 1 : selectedIndex;
-            return new TodoModel(todos, newIndex, mode, inputBuffer,
-                    newIndex != selectedIndex ? "Moved down" : "At bottom");
+            return this.toBuilder()
+                    .selectedIndex(newIndex)
+                    .statusMessage(newIndex != selectedIndex ? "Moved down" : "At bottom")
+                    .build();
         }
 
         private TodoModel moveUp() {
             int newIndex = selectedIndex > 0 ? selectedIndex - 1 : selectedIndex;
-            return new TodoModel(todos, newIndex, mode, inputBuffer,
-                    newIndex != selectedIndex ? "Moved up" : "At top");
+            return this.toBuilder()
+                    .selectedIndex(newIndex)
+                    .statusMessage(newIndex != selectedIndex ? "Moved up" : "At top")
+                    .build();
         }
 
         private TodoModel toggleSelected() {
             if (todos.isEmpty()) {
-                return new TodoModel(todos, selectedIndex, mode, inputBuffer, "No todos to toggle");
+                return this.toBuilder().statusMessage("No todos to toggle").build();
             }
 
             List<TodoItem> newTodos = new ArrayList<>(todos);
             TodoItem current = newTodos.get(selectedIndex);
             newTodos.set(selectedIndex, current.toggle());
 
-            return new TodoModel(newTodos, selectedIndex, mode, inputBuffer,
-                    current.completed ? "Marked as incomplete" : "Marked as complete");
+            return this.toBuilder()
+                    .todos(newTodos)
+                    .statusMessage(current.completed ? "Marked as incomplete" : "Marked as complete")
+                    .build();
         }
 
         private TodoModel deleteSelected() {
             if (todos.isEmpty()) {
-                return new TodoModel(todos, selectedIndex, mode, inputBuffer, "No todos to delete");
+                return this.toBuilder().statusMessage("No todos to delete").build();
             }
 
             List<TodoItem> newTodos = new ArrayList<>(todos);
             TodoItem deleted = newTodos.remove(selectedIndex);
             int newSelectedIndex = selectedIndex >= newTodos.size() ? Math.max(0, newTodos.size() - 1) : selectedIndex;
 
-            return new TodoModel(newTodos, newSelectedIndex, mode, inputBuffer,
-                    "Deleted: " + deleted.text());
+            return this.toBuilder()
+                    .todos(newTodos)
+                    .selectedIndex(newSelectedIndex)
+                    .statusMessage("Deleted: " + deleted.text())
+                    .build();
         }
 
         @Override
@@ -143,9 +219,11 @@ public class TodoApp {
 
                     String line = text;
                     if (i == selectedIndex && mode == AppMode.VIEWING) {
-                        line = Style.of().background(Style.Color.BLUE).foreground(Style.Color.WHITE).render(" " + line + " ");
+                        line = Style.of().background(Style.Color.BLUE).foreground(Style.Color.WHITE)
+                                .render(" " + line + " ");
                     } else {
-                        line = (todo.completed() ? Style.of().foreground(Style.Color.GREEN) : Style.of().foreground(Style.Color.WHITE)).render(line);
+                        line = (todo.completed() ? Style.of().foreground(Style.Color.GREEN)
+                                : Style.of().foreground(Style.Color.WHITE)).render(line);
                     }
 
                     listItems.add(Text.plain().build(line));
@@ -163,10 +241,10 @@ public class TodoApp {
                             ifAdding(),
                             Text.plain().foreground(Style.Color.YELLOW).build(statusMessage),
                             Text.plain().build(switch (mode) {
-                                case VIEWING -> "j/k or ↑↓: navigate | Space/Enter: toggle | a: add | d: delete | q: quit";
+                                case VIEWING ->
+                                    "j/k or ↑↓: navigate | Space/Enter: toggle | a: add | d: delete | q: quit";
                                 case ADDING -> "Type todo text | Enter: save | Escape: cancel";
-                            })
-                    ))
+                            })))
                     .build();
 
             return ui.render();
@@ -183,7 +261,7 @@ public class TodoApp {
 
     public static void main(String[] args) {
         try {
-            Program program = new Program();
+            Program<Event> program = new Program<>(java.util.Optional::of, m -> java.util.List.of());
             program.run(TodoModel.initial());
         } catch (Exception e) {
             System.err.println("Error running todo app: " + e.getMessage());

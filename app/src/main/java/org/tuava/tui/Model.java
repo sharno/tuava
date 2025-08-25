@@ -1,11 +1,11 @@
 package org.tuava.tui;
 
-public interface Model {
-    Model update(Event event);
+public interface Model<Msg> {
+    Update<Msg> update(Msg message);
 
     String view();
 
-    default Command init() {
-        return Command.none();
+    default Effect<Msg> init() {
+        return Effect.none();
     }
 }
