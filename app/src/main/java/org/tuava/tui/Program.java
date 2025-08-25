@@ -23,6 +23,7 @@ public class Program<Msg> {
     private final java.util.function.Function<Event, Optional<Msg>> eventToMessage;
     private final java.util.function.Function<Model<Msg>, List<Stream<Msg>>> streamsForModel;
     private final Map<String, AutoCloseable> activeStreams = new ConcurrentHashMap<>();
+    private Thread inputThread;
 
     public Program(java.util.function.Function<Event, Optional<Msg>> eventToMessage,
             java.util.function.Function<Model<Msg>, List<Stream<Msg>>> streamsForModel) {
@@ -58,40 +59,40 @@ public class Program<Msg> {
         diffStreams(null, currentModel);
 
         try {
-            while (running) {
-                // Non-blocking: first drain any queued messages
-                Msg queued = messageQueue.poll();
-                if (queued != null) {
-                    Update<Msg> upd = currentModel.update(queued);
-                    if (upd.model() != currentModel) {
-                        Model<Msg> previous = currentModel;
-                        currentModel = upd.model();
-                        render(currentModel);
-                        diffStreams(previous, currentModel);
+            // Start input reader thread to avoid blocking and allow Streams to refresh UI
+            inputThread = new Thread(() -> {
+                try {
+                    while (running) {
+                        Event event = terminal.readEvent();
+                        if (event == null) {
+                            break;
+                        }
+                        Optional<Msg> maybe = eventToMessage.apply(event);
+                        maybe.ifPresent(messageQueue::offer);
                     }
-                    processEffect(upd.effect());
+                } catch (IOException ignored) {
+                }
+            }, "tuava-input-reader");
+            inputThread.setDaemon(true);
+            inputThread.start();
+
+            while (running) {
+                Msg msg;
+                try {
+                    msg = messageQueue.take();
+                } catch (InterruptedException ie) {
+                    if (!running)
+                        break;
                     continue;
                 }
-
-                // Otherwise, read terminal event (blocking)
-                Event event = terminal.readEvent();
-                if (event == null) {
-                    break;
+                Update<Msg> upd = currentModel.update(msg);
+                if (upd.model() != currentModel) {
+                    Model<Msg> previous = currentModel;
+                    currentModel = upd.model();
+                    render(currentModel);
+                    diffStreams(previous, currentModel);
                 }
-
-                // Map to message if possible
-                Optional<Msg> maybeMsg = eventToMessage.apply(event);
-                if (maybeMsg.isPresent()) {
-                    Msg msg = maybeMsg.get();
-                    Update<Msg> upd = currentModel.update(msg);
-                    if (upd.model() != currentModel) {
-                        Model<Msg> previous = currentModel;
-                        currentModel = upd.model();
-                        render(currentModel);
-                        diffStreams(previous, currentModel);
-                    }
-                    processEffect(upd.effect());
-                }
+                processEffect(upd.effect());
             }
         } finally {
             cleanup();
@@ -182,6 +183,12 @@ public class Program<Msg> {
             executor.shutdown();
             if (scheduler != null) {
                 scheduler.shutdownNow();
+            }
+            if (inputThread != null) {
+                try {
+                    inputThread.interrupt();
+                } catch (Exception ignored) {
+                }
             }
             for (var entry : activeStreams.entrySet()) {
                 try {
