@@ -8,7 +8,11 @@ import java.time.format.DateTimeFormatter;
 
 public class ClockApp {
 
-    public record ClockModel(String timeText, String hint) implements Model<Event> {
+    public enum Msg {
+        TICK, QUIT
+    }
+
+    public record ClockModel(String timeText, String hint) implements Model<Msg> {
         private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
         public static ClockModel initial() {
@@ -16,17 +20,10 @@ public class ClockApp {
         }
 
         @Override
-        public Update<Event> update(Event event) {
-            return switch (event) {
-                case Event.TickEvent tick -> Update.of(new ClockModel(LocalTime.now().format(FORMAT), hint));
-                case Event.KeyEvent key -> switch (key.key()) {
-                    case CHAR -> switch (key.sequence()) {
-                        case "q" -> Update.of(this, Effect.quit());
-                        default -> Update.of(this);
-                    };
-                    default -> Update.of(this);
-                };
-                default -> Update.of(this);
+        public Update<Msg> update(Msg msg) {
+            return switch (msg) {
+                case TICK -> Update.of(new ClockModel(LocalTime.now().format(FORMAT), hint));
+                case QUIT -> Update.of(this, Effect.quit());
             };
         }
 
@@ -39,13 +36,19 @@ public class ClockApp {
         }
     }
 
+    private static java.util.Optional<Msg> mapEventToMsg(Event e) {
+        if (e instanceof Event.KeyEvent k && k.key() == Event.Key.CHAR && "q".equals(k.sequence())) {
+            return java.util.Optional.of(Msg.QUIT);
+        }
+        return java.util.Optional.empty();
+    }
+
     public static void main(String[] args) {
         try {
-            Program<Event> program = new Program<>(
-                    java.util.Optional::of,
+            Program<Msg> program = new Program<>(
+                    ClockApp::mapEventToMsg,
                     m -> java.util.List.of(
-                            Stream.interval("clock", Duration.ofSeconds(1),
-                                    () -> new Event.TickEvent(System.currentTimeMillis()))));
+                            Stream.interval("clock", Duration.ofSeconds(1), () -> Msg.TICK)));
             program.run(ClockModel.initial());
         } catch (Exception e) {
             System.err.println("Error running clock app: " + e.getMessage());
